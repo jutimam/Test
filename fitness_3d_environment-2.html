@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX FITNESS — 3D Environment</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --gold: #D4A843;
+    --gold-light: #F5C842;
+    --gold-dark: #8B6914;
+    --dark: #080A0F;
+    --dark2: #0D1018;
+    --dark3: #141820;
+    --surface: #1A1F2E;
+    --text: #E8E0D0;
+    --text-muted: #7A7060;
+    --accent: #FF4B2B;
+    --teal: #00D4AA;
+  }
+
+  body {
+    background: #F5F5F0;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    cursor: none;
+  }
+
+  #canvas-container {
+    position: fixed; inset: 0;
+    z-index: 1;
+  }
+
+  canvas { display: block; }
+
+  /* CUSTOM CURSOR */
+  #cursor {
+    position: fixed;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s ease, width 0.2s, height 0.2s;
+    mix-blend-mode: screen;
+  }
+  #cursor-ring {
+    position: fixed;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(212,168,67,0.5);
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: left 0.12s ease, top 0.12s ease;
+  }
+
+  /* HUD OVERLAY */
+  #hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* LOGO */
+  #logo {
+    position: fixed;
+    top: 32px; left: 40px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  #logo .brand {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 36px;
+    letter-spacing: 6px;
+    color: var(--gold);
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(212,168,67,0.5);
+  }
+  #logo .sub {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 8px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* STATS PANEL */
+  #stats-panel {
+    position: fixed;
+    top: 32px; right: 40px;
+    z-index: 20;
+    pointer-events: none;
+    display: flex; gap: 20px;
+  }
+  .stat-box {
+    background: rgba(10,12,18,0.8);
+    border: 1px solid rgba(212,168,67,0.2);
+    padding: 12px 18px;
+    backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .stat-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 28px;
+    color: var(--gold-light);
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .stat-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+  }
+
+  /* CONTROLS INFO */
+  #controls-info {
+    position: fixed;
+    bottom: 32px; left: 40px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .ctrl-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .ctrl-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .key {
+    background: rgba(212,168,67,0.1);
+    border: 1px solid rgba(212,168,67,0.3);
+    padding: 3px 8px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: var(--gold-light);
+    letter-spacing: 1px;
+    min-width: 28px;
+    text-align: center;
+  }
+  .ctrl-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  /* CROSSHAIR */
+  #crosshair {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #crosshair.active { opacity: 1; }
+  .ch-h, .ch-v {
+    position: absolute;
+    background: rgba(212,168,67,0.6);
+  }
+  .ch-h { width: 20px; height: 1px; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+  .ch-v { width: 1px; height: 20px; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+  .ch-dot { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--gold); top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+  /* SPEED BAR */
+  #speed-bar {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .speed-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+  }
+  .speed-track {
+    width: 120px; height: 3px;
+    background: rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .speed-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+    transition: width 0.2s ease;
+    box-shadow: 0 0 8px var(--gold);
+  }
+
+  /* UPLOAD PANEL */
+  #upload-panel {
+    position: fixed;
+    right: 40px;
+    bottom: 32px;
+    z-index: 20;
+    width: 280px;
+    background: rgba(8,10,15,0.92);
+    border: 1px solid rgba(212,168,67,0.25);
+    backdrop-filter: blur(30px);
+    overflow: hidden;
+    transition: transform 0.4s cubic-bezier(0.16,1,0.3,1), opacity 0.3s;
+  }
+  #upload-panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-light), var(--gold-dark));
+  }
+
+  .panel-header {
+    padding: 16px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(212,168,67,0.1);
+  }
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  #panel-toggle {
+    background: none;
+    border: 1px solid rgba(212,168,67,0.3);
+    color: var(--gold);
+    width: 26px; height: 26px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+    font-family: monospace;
+  }
+  #panel-toggle:hover { background: rgba(212,168,67,0.1); }
+
+  .panel-body {
+    padding: 16px 20px;
+  }
+
+  .upload-zone {
+    border: 1px dashed rgba(212,168,67,0.3);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--gold);
+    background: rgba(212,168,67,0.06);
+  }
+  .upload-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(212,168,67,0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .upload-zone:hover::before { opacity: 1; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+  .upload-text span { color: var(--gold-light); }
+  #file-input { display: none; }
+
+  .wall-selector {
+    margin-bottom: 14px;
+  }
+  .sel-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: block;
+  }
+  .wall-btns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .wall-btn {
+    background: rgba(212,168,67,0.05);
+    border: 1px solid rgba(212,168,67,0.2);
+    color: var(--text-muted);
+    padding: 8px 4px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .wall-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .wall-btn.active { background: rgba(212,168,67,0.15); border-color: var(--gold); color: var(--gold-light); }
+
+  .preview-strip {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preview-thumb {
+    width: 56px; height: 56px;
+    border: 1px solid rgba(212,168,67,0.2);
+    object-fit: cover;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+  .preview-thumb:hover { border-color: var(--gold); }
+
+  .apply-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+    border: none;
+    color: var(--dark);
+    font-family: 'Bebas Neue', cursive;
+    font-size: 18px;
+    letter-spacing: 4px;
+    padding: 10px;
+    cursor: pointer;
+    margin-top: 14px;
+    transition: opacity 0.2s, transform 0.1s;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  .apply-btn:hover { opacity: 0.85; }
+  .apply-btn:active { transform: scale(0.98); }
+
+  /* NOTIFICATION */
+  #notif {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    background: rgba(8,10,15,0.95);
+    border: 1px solid var(--gold);
+    padding: 16px 32px;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--gold-light);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    text-align: center;
+  }
+  #notif.show { opacity: 1; }
+
+  /* LOCK ICON */
+  #lock-hint {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, calc(-50% + 60px));
+    z-index: 5;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+  #lock-hint .lh-icon { font-size: 32px; margin-bottom: 8px; }
+  #lock-hint .lh-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-shadow: 0 0 20px rgba(212,168,67,0.8);
+  }
+
+  /* SCANLINE EFFECT */
+  #scanlines {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  }
+
+  /* VIGNETTE */
+  #vignette {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(200,195,185,0.3) 100%);
+  }
+
+  /* CORNER DECO */
+  .corner { position: fixed; width: 40px; height: 40px; z-index: 25; pointer-events: none; }
+  .corner::before, .corner::after { content: ''; position: absolute; background: var(--gold); opacity: 0.4; }
+  .corner-tl { top: 20px; left: 20px; }
+  .corner-tl::before { width: 100%; height: 1px; top: 0; left: 0; }
+  .corner-tl::after { width: 1px; height: 100%; top: 0; left: 0; }
+  .corner-tr { top: 20px; right: 20px; }
+  .corner-tr::before { width: 100%; height: 1px; top: 0; right: 0; }
+  .corner-tr::after { width: 1px; height: 100%; top: 0; right: 0; }
+  .corner-bl { bottom: 20px; left: 20px; }
+  .corner-bl::before { width: 100%; height: 1px; bottom: 0; left: 0; }
+  .corner-bl::after { width: 1px; height: 100%; bottom: 0; left: 0; }
+  .corner-br { bottom: 20px; right: 20px; }
+  .corner-br::before { width: 100%; height: 1px; bottom: 0; right: 0; }
+  .corner-br::after { width: 1px; height: 100%; bottom: 0; right: 0; }
+
+  /* PANEL COLLAPSED */
+  #upload-panel.collapsed .panel-body { display: none; }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+
+<div id="canvas-container"></div>
+
+<!-- CORNER DECO -->
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<!-- LOGO -->
+<div id="logo">
+  <div class="brand">APEX FITNESS</div>
+  <div class="sub">PREMIUM 3D ENVIRONMENT</div>
+</div>
+
+<!-- STATS -->
+<div id="stats-panel">
+  <div class="stat-box">
+    <div class="stat-label">SPEED</div>
+    <div class="stat-value" id="stat-speed">0<span class="stat-unit">m/s</span></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">POSITION</div>
+    <div class="stat-value" id="stat-pos">0,0</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">HEADING</div>
+    <div class="stat-value" id="stat-heading">N</div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="crosshair" class="active">
+    <div class="ch-h"></div>
+    <div class="ch-v"></div>
+    <div class="ch-dot"></div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls-info">
+  <div class="ctrl-title">NAVIGATION</div>
+  <div class="ctrl-row"><span class="key">W</span><span class="ctrl-desc">เดินหน้า</span></div>
+  <div class="ctrl-row"><span class="key">S</span><span class="ctrl-desc">ถอยหลัง</span></div>
+  <div class="ctrl-row"><span class="key">A</span><span class="ctrl-desc">ซ้าย</span></div>
+  <div class="ctrl-row"><span class="key">D</span><span class="ctrl-desc">ขวา</span></div>
+  <div class="ctrl-row"><span class="key">↑↓</span><span class="ctrl-desc">มองขึ้น/ลง</span></div>
+  <div class="ctrl-row"><span class="key">←→</span><span class="ctrl-desc">หันซ้าย/ขวา</span></div>
+  <div class="ctrl-row"><span class="key">DRAG</span><span class="ctrl-desc">หมุนกล้อง</span></div>
+</div>
+
+<!-- SPEED BAR -->
+<div id="speed-bar">
+  <span class="speed-label">VELOCITY</span>
+  <div class="speed-track">
+    <div class="speed-fill" id="speed-fill" style="width:0%"></div>
+  </div>
+  <span class="speed-label">MAX</span>
+</div>
+
+<!-- UPLOAD PANEL -->
+<div id="upload-panel">
+  <div class="panel-header">
+    <div class="panel-title">WALL MEDIA</div>
+    <button id="panel-toggle">−</button>
+  </div>
+  <div class="panel-body">
+    <div class="upload-zone" id="upload-zone">
+      <div class="upload-icon">⬆</div>
+      <div class="upload-text">วาง / <span>คลิกเพื่ออัปโหลด</span></div>
+      <div class="upload-text" style="font-size:11px;margin-top:4px;">JPG, PNG, WEBP</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple>
+
+    <div class="wall-selector">
+      <span class="sel-label">SELECT WALL</span>
+      <div class="wall-btns">
+        <button class="wall-btn active" data-wall="0">FRONT</button>
+        <button class="wall-btn" data-wall="1">BACK</button>
+        <button class="wall-btn" data-wall="2">LEFT</button>
+        <button class="wall-btn" data-wall="3">RIGHT</button>
+      </div>
+    </div>
+
+    <div class="preview-strip" id="preview-strip"></div>
+    <button class="apply-btn" id="apply-btn">APPLY TEXTURE</button>
+  </div>
+</div>
+
+<!-- LOCK HINT -->
+<div id="lock-hint">
+  <div class="lh-icon">🔒</div>
+  <div class="lh-text">CLICK TO ENABLE MOUSE LOOK</div>
+</div>
+
+<div id="notif"></div>
+
+<script>
+/* ─── SCENE SETUP ─── */
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.6;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xF5F5F0);
+scene.fog = new THREE.Fog(0xF0F0EC, 22, 50);
+
+const camera = new THREE.PerspectiveCamera(70, W/H, 0.1, 100);
+camera.position.set(0, 1.7, 0);
+
+/* ─── CANVAS TEXTURE HELPERS ─── */
+function makeFloorTex() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
+  const ctx = c.getContext('2d');
+  // Bright white base
+  ctx.fillStyle = '#F8F8F6'; ctx.fillRect(0,0,1024,1024);
+  // Subtle grid lines
+  ctx.strokeStyle = 'rgba(180,160,100,0.18)'; ctx.lineWidth = 1;
+  for(let i=0;i<=1024;i+=64){
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,1024); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1024,i); ctx.stroke();
+  }
+  // Diagonal faint lines
+  ctx.strokeStyle = 'rgba(212,168,67,0.07)'; ctx.lineWidth = 0.5;
+  for(let i=-1024;i<2048;i+=128){
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i+1024,1024); ctx.stroke();
+  }
+  // Center circle subtle
+  const grad = ctx.createRadialGradient(512,512,0,512,512,400);
+  grad.addColorStop(0,'rgba(212,168,67,0.06)');
+  grad.addColorStop(1,'transparent');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,1024,1024);
+  ctx.strokeStyle='rgba(212,168,67,0.25)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(512,512,380,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(512,512,300,0,Math.PI*2); ctx.stroke();
+  // APEX text faint
+  ctx.save(); ctx.translate(512,512); ctx.rotate(-Math.PI/2);
+  ctx.font='bold 80px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(180,150,60,0.05)'; ctx.fillText('APEX FITNESS',0,0); ctx.restore();
+  return new THREE.CanvasTexture(c);
+}
+
+function makeWallTex(color1='#F2F2EE', color2='#E8E8E4', accent='rgba(212,168,67,0.12)') {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,512);
+  g.addColorStop(0,color1); g.addColorStop(1,color2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,1024,512);
+  // Horizontal lines subtle
+  ctx.strokeStyle=accent; ctx.lineWidth=0.5;
+  for(let y=0;y<512;y+=64){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(1024,y); ctx.stroke(); }
+  // Vertical panel dividers
+  ctx.strokeStyle='rgba(180,160,100,0.08)'; ctx.lineWidth=1;
+  for(let x=0;x<1024;x+=128){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,512); ctx.stroke(); }
+  // Gold glow strip at top
+  const gg = ctx.createLinearGradient(0,0,0,50);
+  gg.addColorStop(0,'rgba(212,168,67,0.2)'); gg.addColorStop(1,'transparent');
+  ctx.fillStyle=gg; ctx.fillRect(0,0,1024,50);
+  // Bottom shadow
+  const gb = ctx.createLinearGradient(0,460,0,512);
+  gb.addColorStop(0,'transparent'); gb.addColorStop(1,'rgba(0,0,0,0.06)');
+  ctx.fillStyle=gb; ctx.fillRect(0,0,1024,512);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeCeilingTex() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#FAFAF8'; ctx.fillRect(0,0,1024,1024);
+  // Subtle grid
+  ctx.strokeStyle='rgba(180,160,100,0.1)'; ctx.lineWidth=1;
+  for(let i=0;i<=1024;i+=128){
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,1024); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1024,i); ctx.stroke();
+  }
+  // Light source glows at panel positions
+  const lightPositions = [[256,256],[768,256],[512,512],[256,768],[768,768]];
+  for(const [lx,ly] of lightPositions){
+    const rg = ctx.createRadialGradient(lx,ly,0,lx,ly,120);
+    rg.addColorStop(0,'rgba(255,245,210,0.6)'); rg.addColorStop(1,'transparent');
+    ctx.fillStyle=rg; ctx.fillRect(0,0,1024,1024);
+    // Panel square
+    ctx.strokeStyle='rgba(212,168,67,0.2)'; ctx.lineWidth=1;
+    ctx.strokeRect(lx-40,ly-40,80,80);
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+function makeMirrorTex() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,512,512);
+  g.addColorStop(0,'#1a2030'); g.addColorStop(0.5,'#252d40'); g.addColorStop(1,'#1a2030');
+  ctx.fillStyle=g; ctx.fillRect(0,0,512,512);
+  // Reflection lines
+  for(let i=0;i<20;i++){
+    const y=Math.random()*512, h=Math.random()*3+0.5;
+    const lg=ctx.createLinearGradient(0,0,512,0);
+    lg.addColorStop(0,'transparent'); lg.addColorStop(0.5,`rgba(180,200,255,${Math.random()*0.15})`); lg.addColorStop(1,'transparent');
+    ctx.fillStyle=lg; ctx.fillRect(0,y,512,h);
+  }
+  // Border
+  ctx.strokeStyle='rgba(212,168,67,0.4)'; ctx.lineWidth=3;
+  ctx.strokeRect(4,4,504,504);
+  ctx.strokeStyle='rgba(212,168,67,0.2)'; ctx.lineWidth=1;
+  ctx.strokeRect(12,12,488,488);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeEquipTex(label, color) {
+  const c = document.createElement('canvas'); c.width=256; c.height=256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#0A0C12'; ctx.fillRect(0,0,256,256);
+  const g = ctx.createLinearGradient(0,0,256,256);
+  g.addColorStop(0,color+'44'); g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.fillRect(0,0,256,256);
+  ctx.strokeStyle=color+'66'; ctx.lineWidth=2; ctx.strokeRect(4,4,248,248);
+  ctx.fillStyle=color; ctx.font='bold 18px Arial'; ctx.textAlign='center';
+  ctx.textBaseline='middle'; ctx.fillText(label,128,128);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ─── ROOM ─── */
+const ROOM_W=24, ROOM_H=5, ROOM_D=24;
+
+const floorTex = makeFloorTex();
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+floorTex.repeat.set(4,4);
+
+const floorMat = new THREE.MeshStandardMaterial({
+  map: floorTex, roughness: 0.08, metalness: 0.3,
+  envMapIntensity: 1.0, color: 0xFFFFFF
+});
+
+const wallTex = makeWallTex();
+wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
+wallTex.repeat.set(3,1);
+
+const ceilTex = makeCeilingTex();
+ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping;
+ceilTex.repeat.set(4,4);
+
+// Floor
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROOM_W,ROOM_D), floorMat
+);
+floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+
+// Ceiling
+const ceiling = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROOM_W,ROOM_D),
+  new THREE.MeshStandardMaterial({map:ceilTex, roughness:0.9, metalness:0.0, color:0xFFFFFF, side:THREE.BackSide})
+);
+ceiling.rotation.x=Math.PI/2; ceiling.position.y=ROOM_H; scene.add(ceiling);
+
+// Walls
+const wallMats = [0,1,2,3].map(i => new THREE.MeshStandardMaterial({
+  map: makeWallTex('#F2F2EE','#EAEAE6'), roughness:0.85, metalness:0.0, color:0xFFFFFF
+}));
+
+// Wall objects store for texture replacement
+const wallObjects = [];
+
+function makeWall(w,h, mat, x,y,z, ry=0) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat);
+  mesh.position.set(x,y,z); mesh.rotation.y=ry;
+  mesh.receiveShadow=true; scene.add(mesh); return mesh;
+}
+
+wallObjects.push(makeWall(ROOM_W,ROOM_H, wallMats[0], 0,ROOM_H/2,-ROOM_D/2, 0));        // front
+wallObjects.push(makeWall(ROOM_W,ROOM_H, wallMats[1], 0,ROOM_H/2, ROOM_D/2, Math.PI));  // back
+wallObjects.push(makeWall(ROOM_D,ROOM_H, wallMats[2], -ROOM_W/2,ROOM_H/2, 0, Math.PI/2)); // left
+wallObjects.push(makeWall(ROOM_D,ROOM_H, wallMats[3],  ROOM_W/2,ROOM_H/2, 0,-Math.PI/2)); // right
+
+/* ─── BASEBOARD LED STRIPS ─── */
+function addLEDStrip(x1,z1,x2,z2, color=0xD4A843) {
+  const points=[new THREE.Vector3(x1,0.05,z1),new THREE.Vector3(x2,0.05,z2)];
+  const geo=new THREE.BufferGeometry().setFromPoints(points);
+  const mat=new THREE.LineBasicMaterial({color, linewidth:2});
+  const line=new THREE.Line(geo,mat); scene.add(line);
+  // Glow box
+  const len=Math.sqrt((x2-x1)**2+(z2-z1)**2);
+  const glow=new THREE.Mesh(
+    new THREE.PlaneGeometry(len,0.08),
+    new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.15, side:THREE.DoubleSide})
+  );
+  glow.rotation.x=-Math.PI/2;
+  glow.position.set((x1+x2)/2, 0.04, (z1+z2)/2);
+  const angle=Math.atan2(z2-z1,x2-x1);
+  glow.rotation.z=-angle;
+  scene.add(glow);
+}
+
+addLEDStrip(-ROOM_W/2,  ROOM_D/2, ROOM_W/2,  ROOM_D/2, 0xD4A843);
+addLEDStrip(-ROOM_W/2, -ROOM_D/2, ROOM_W/2, -ROOM_D/2, 0xD4A843);
+addLEDStrip(-ROOM_W/2,  ROOM_D/2,-ROOM_W/2, -ROOM_D/2, 0xD4A843);
+addLEDStrip( ROOM_W/2,  ROOM_D/2, ROOM_W/2, -ROOM_D/2, 0xD4A843);
+
+/* ─── CEILING LED STRIPS ─── */
+const ceilLEDY = ROOM_H - 0.05;
+function addCeilLED(x1,z1,x2,z2, color=0x00D4AA) {
+  const points=[new THREE.Vector3(x1,ceilLEDY,z1),new THREE.Vector3(x2,ceilLEDY,z2)];
+  const line=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({color})
+  );
+  scene.add(line);
+}
+// Ceiling accent grid — warm gold
+for(let x=-8;x<=8;x+=8){ addCeilLED(x,-ROOM_D/2+1,x,ROOM_D/2-1,0xFFCC44); }
+for(let z=-8;z<=8;z+=8){ addCeilLED(-ROOM_W/2+1,z,ROOM_W/2-1,z,0xFFCC44); }
+
+/* ─── MIRRORS (left wall) ─── */
+const mirrorTex = makeMirrorTex();
+for(let i=0;i<3;i++){
+  const mir = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.5,3),
+    new THREE.MeshStandardMaterial({map:mirrorTex, roughness:0.05, metalness:0.95, envMapIntensity:2})
+  );
+  mir.position.set(-ROOM_W/2+0.05, 2.2, -6+i*6);
+  mir.rotation.y=Math.PI/2;
+  scene.add(mir);
+  // Frame
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08,3.1,3.6),
+    new THREE.MeshStandardMaterial({color:0xD4A843, roughness:0.2, metalness:0.9})
+  );
+  frame.position.set(-ROOM_W/2+0.04, 2.2, -6+i*6); scene.add(frame);
+}
+
+/* ─── EQUIPMENT ─── */
+function addBox(w,h,d, x,y,z, color=0x1A1F2E, label='') {
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.4, metalness:0.6});
+  if(label) mat.map = makeEquipTex(label,'#D4A843');
+  const box = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  box.position.set(x,y+h/2,z); box.castShadow=true; box.receiveShadow=true;
+  scene.add(box); return box;
+}
+
+function addCylinder(rt,rb,h,x,y,z,color=0x222832) {
+  const cyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(rt,rb,h,16),
+    new THREE.MeshStandardMaterial({color,roughness:0.3,metalness:0.8})
+  );
+  cyl.position.set(x,y+h/2,z); cyl.castShadow=true; scene.add(cyl); return cyl;
+}
+
+// Treadmills
+for(let i=0;i<4;i++){
+  addBox(0.9,0.3,2.2, -6+i*4, 0, 3, 0xC8C8C4, 'TREADMILL');
+  // Console
+  const consoleBox = addBox(0.7,0.15,0.4, -6+i*4, 1.2, 2.3, 0xD8D8D4,'');
+  // Pole
+  addCylinder(0.03,0.03,1.2, -6+i*4, 0.3, 2.3, 0xA0906020);
+  // Belt surface
+  const belt = new THREE.Mesh(new THREE.PlaneGeometry(0.8,2),
+    new THREE.MeshStandardMaterial({color:0x555550,roughness:0.9}));
+  belt.rotation.x=-Math.PI/2; belt.position.set(-6+i*4,0.32,3); scene.add(belt);
+}
+
+// Weight racks (right wall)
+for(let i=0;i<3;i++){
+  // Rack frame
+  addBox(0.08,1.6,2, ROOM_W/2-0.8, 0, -6+i*5, 0x8B6914);
+  addBox(0.08,1.6,2, ROOM_W/2-2.2, 0, -6+i*5, 0x8B6914);
+  addBox(2, 0.06,0.1, ROOM_W/2-1.5, 1.4, -6+i*5, 0x8B6914);
+  addBox(2, 0.06,0.1, ROOM_W/2-1.5, 0.9, -6+i*5, 0x8B6914);
+  addBox(2, 0.06,0.1, ROOM_W/2-1.5, 0.4, -6+i*5, 0x8B6914);
+  // Dumbbells
+  for(let j=0;j<4;j++){
+    addCylinder(0.14,0.14,0.22, ROOM_W/2-2.0+j*0.55, 0.9+0.55, -6+i*5, j%2===0?0x222832:0xD4A843);
+  }
+}
+
+// Bench press stations
+for(let i=0;i<2;i++){
+  addBox(0.7,0.45,1.8, -9+i*18, 0, -5, 0xC0C0BC,'');
+  addBox(0.5,0.08,0.5, -9+i*18, 0.45, -4.5, 0xD0D0CC,'');
+  // Bar support
+  addBox(0.06,0.8,0.06, -9+i*18-0.4, 0.5, -5.5, 0x8B6914,'');
+  addBox(0.06,0.8,0.06, -9+i*18+0.4, 0.5, -5.5, 0x8B6914,'');
+  addBox(1.5,0.04,0.04, -9+i*18, 1.35, -5.5, 0x8B6914,'');
+}
+
+// Cable machines (corners)
+for(const [cx,cz,ry] of [[-9,-9,Math.PI/4],[9,-9,-Math.PI/4]]) {
+  const m = addBox(1.2,2.2,0.5, cx,0,cz,0xD0D0CC,'');
+  addBox(0.06,2.2,0.06, cx-0.5,0,cz+0.2, 0x8B6914);
+  addBox(0.06,2.2,0.06, cx+0.5,0,cz+0.2, 0x8B6914);
+  addBox(1.1,0.04,0.04, cx,2.2,cz+0.2, 0xD4A843);
+}
+
+// Pull-up rig (center back)
+addBox(0.08,3,0.08, -1.5, 0,-9, 0x8B6914);
+addBox(0.08,3,0.08,  1.5, 0,-9, 0x8B6914);
+addBox(3.2,0.08,0.08,0, 3.0,-9, 0xD4A843);
+addBox(3.2,0.08,0.08,0, 2.2,-9, 0x8B6914);
+// Pull-up bar
+addCylinder(0.025,0.025,3.2, 0,2.95,-9, 0xD4A843);
+
+/* ─── DECORATIVE PILLARS ─── */
+for(const [px,pz] of [[-8,-8],[8,-8],[-8,8],[8,8]]) {
+  addBox(0.4,ROOM_H,0.4,px,0,pz,0xEEEEEA);
+  // Gold cap
+  addBox(0.5,0.1,0.5,px,ROOM_H-0.1,pz,0xD4A843);
+  addBox(0.5,0.1,0.5,px,0.05,pz,0xD4A843);
+  // LED strip on pillar — warm gold
+  const ledMat = new THREE.MeshBasicMaterial({color:0xFFD060, transparent:true, opacity:0.9});
+  const led = new THREE.Mesh(new THREE.BoxGeometry(0.02,ROOM_H-0.4,0.02),ledMat);
+  led.position.set(px+0.21,ROOM_H/2,pz); scene.add(led);
+}
+
+/* ─── LIGHTING ─── */
+const ambient = new THREE.AmbientLight(0xFFFFFF, 2.5);
+scene.add(ambient);
+
+// Main spots — bright white daylight
+const spotPositions = [
+  [-4,ROOM_H-0.2,-4], [4,ROOM_H-0.2,-4],
+  [-4,ROOM_H-0.2, 4], [4,ROOM_H-0.2, 4],
+  [0, ROOM_H-0.2, 0],
+  [-8,ROOM_H-0.2,-8],[8,ROOM_H-0.2,-8],
+  [-8,ROOM_H-0.2, 8],[8,ROOM_H-0.2, 8]
+];
+
+spotPositions.forEach(([x,y,z],i) => {
+  const spot = new THREE.SpotLight(0xFFFFFF, i===4?4.5:3.5, 22, Math.PI/4, 0.35, 1.2);
+  spot.position.set(x,y,z);
+  spot.target.position.set(x,0,z);
+  spot.castShadow=true;
+  spot.shadow.mapSize.width=256; spot.shadow.mapSize.height=256;
+  scene.add(spot); scene.add(spot.target);
+  // Fixture mesh — white panel
+  addBox(0.3,0.06,0.3, x,y+0.03,z, 0xF0F0F0);
+});
+
+// Accent PointLights — warm gold fill
+const accents = [
+  {color:0xFFE0A0, x:-10, z:-10, i:2.0},
+  {color:0xFFE0A0, x:10,  z:-10, i:2.0},
+  {color:0xFFE8B0, x:0,   z: 10, i:2.0},
+  {color:0xFFFFFF, x:0,   z: 0,  i:3.0},
+];
+accents.forEach(({color,x,z,i})=>{
+  const pt=new THREE.PointLight(color,i,18);
+  pt.position.set(x,ROOM_H-0.5,z); scene.add(pt);
+});
+
+// Hemisphere — sky bright white, ground soft
+const hemi = new THREE.HemisphereLight(0xFFFFFF,0xE8E0D0,1.8);
+scene.add(hemi);
+
+/* ─── FLOATING PARTICLES ─── */
+const particleCount=200;
+const pGeo=new THREE.BufferGeometry();
+const pPos=new Float32Array(particleCount*3);
+for(let i=0;i<particleCount;i++){
+  pPos[i*3]=(Math.random()-0.5)*ROOM_W*0.9;
+  pPos[i*3+1]=Math.random()*ROOM_H;
+  pPos[i*3+2]=(Math.random()-0.5)*ROOM_D*0.9;
+}
+pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));
+const pMat=new THREE.PointsMaterial({color:0xD4A843,size:0.03,transparent:true,opacity:0.4});
+const particles=new THREE.Points(pGeo,pMat);
+scene.add(particles);
+
+/* ─── CAMERA CONTROL ─── */
+const euler=new THREE.Euler(0,0,0,'YXZ');
+const quat=new THREE.Quaternion();
+let pointerLocked=false;
+const keys={};
+
+renderer.domElement.addEventListener('click',()=>{
+  if(!pointerLocked) renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange',()=>{
+  pointerLocked=document.pointerLockElement===renderer.domElement;
+  document.getElementById('crosshair').classList.toggle('active',true);
+  document.getElementById('lock-hint').style.opacity=pointerLocked?'0':'1';
+});
+document.addEventListener('mousemove',(e)=>{
+  if(pointerLocked){
+    euler.y-=e.movementX*0.002;
+    euler.x-=e.movementY*0.002;
+    euler.x=Math.max(-Math.PI/3,Math.min(Math.PI/3,euler.x));
+    camera.quaternion.setFromEuler(euler);
+  }
+});
+
+// Drag look (non-pointer-lock)
+let dragging=false, lastMX=0, lastMY=0;
+renderer.domElement.addEventListener('mousedown',(e)=>{if(!pointerLocked){dragging=true;lastMX=e.clientX;lastMY=e.clientY;}});
+document.addEventListener('mouseup',()=>{dragging=false;});
+document.addEventListener('mousemove',(e)=>{
+  if(dragging&&!pointerLocked){
+    euler.y-=(e.clientX-lastMX)*0.003;
+    euler.x-=(e.clientY-lastMY)*0.003;
+    euler.x=Math.max(-Math.PI/3,Math.min(Math.PI/3,euler.x));
+    camera.quaternion.setFromEuler(euler);
+    lastMX=e.clientX; lastMY=e.clientY;
+  }
+});
+
+document.addEventListener('keydown',e=>{ keys[e.code]=true; });
+document.addEventListener('keyup',e=>{ keys[e.code]=false; });
+
+const SPEED=0.07, BOUNDS=ROOM_W/2-1;
+let currentSpeed=0;
+
+function updateCamera(){
+  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion); fwd.y=0; fwd.normalize();
+  const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion); right.y=0; right.normalize();
+  let moved=false;
+  const vel=new THREE.Vector3();
+
+  if(keys['KeyW']||keys['ArrowUp']){ vel.add(fwd); moved=true; }
+  if(keys['KeyS']||keys['ArrowDown']){ vel.sub(fwd); moved=true; }
+  if(keys['KeyA']){ vel.sub(right); moved=true; }
+  if(keys['KeyD']){ vel.add(right); moved=true; }
+  if(keys['ArrowLeft']){ euler.y+=0.03; camera.quaternion.setFromEuler(euler); }
+  if(keys['ArrowRight']){ euler.y-=0.03; camera.quaternion.setFromEuler(euler); }
+
+  if(moved){ vel.normalize().multiplyScalar(SPEED); camera.position.add(vel); }
+
+  camera.position.x=Math.max(-BOUNDS,Math.min(BOUNDS,camera.position.x));
+  camera.position.z=Math.max(-BOUNDS,Math.min(BOUNDS,camera.position.z));
+  camera.position.y=1.7;
+
+  currentSpeed = moved ? Math.min(currentSpeed+0.1,1) : Math.max(currentSpeed-0.1,0);
+
+  // HUD
+  document.getElementById('stat-speed').innerHTML = (currentSpeed*2.5).toFixed(1)+'<span class="stat-unit">m/s</span>';
+  document.getElementById('stat-pos').textContent = `${camera.position.x.toFixed(0)},${camera.position.z.toFixed(0)}`;
+  const headingDeg = (((-euler.y*180/Math.PI)%360)+360)%360;
+  const headings=['N','NE','E','SE','S','SW','W','NW'];
+  document.getElementById('stat-heading').textContent = headings[Math.round(headingDeg/45)%8];
+  document.getElementById('speed-fill').style.width=(currentSpeed*100)+'%';
+}
+
+/* ─── CURSOR ─── */
+const cursor=document.getElementById('cursor');
+const cursorRing=document.getElementById('cursor-ring');
+document.addEventListener('mousemove',e=>{
+  cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
+  cursorRing.style.left=e.clientX+'px'; cursorRing.style.top=e.clientY+'px';
+});
+
+/* ─── UPLOAD PANEL LOGIC ─── */
+let selectedWall=0;
+let pendingTexURL=null;
+const uploads=[null,null,null,null];
+
+const wallBtns=document.querySelectorAll('.wall-btn');
+wallBtns.forEach(btn=>btn.addEventListener('click',()=>{
+  wallBtns.forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedWall=parseInt(btn.dataset.wall);
+  if(uploads[selectedWall]) pendingTexURL=uploads[selectedWall];
+}));
+
+const uploadZone=document.getElementById('upload-zone');
+const fileInput=document.getElementById('file-input');
+const previewStrip=document.getElementById('preview-strip');
+
+uploadZone.addEventListener('click',()=>fileInput.click());
+uploadZone.addEventListener('dragover',e=>{ e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop',e=>{ e.preventDefault(); uploadZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+
+function handleFiles(files){
+  Array.from(files).forEach(file=>{
+    if(!file.type.startsWith('image/')) return;
+    const url=URL.createObjectURL(file);
+    uploads[selectedWall]=url;
+    pendingTexURL=url;
+    // Thumbnail
+    const img=document.createElement('img');
+    img.src=url; img.className='preview-thumb';
+    img.title='Wall '+(selectedWall)+' texture';
+    img.addEventListener('click',()=>{ pendingTexURL=url; });
+    previewStrip.appendChild(img);
+    showNotif('IMAGE LOADED — PRESS APPLY');
+  });
+}
+
+document.getElementById('apply-btn').addEventListener('click',()=>{
+  if(!pendingTexURL){ showNotif('SELECT AN IMAGE FIRST'); return; }
+  const loader=new THREE.TextureLoader();
+  loader.load(pendingTexURL, tex=>{
+    tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+    wallMats[selectedWall].map=tex;
+    wallMats[selectedWall].needsUpdate=true;
+    showNotif('TEXTURE APPLIED TO WALL '+(selectedWall+1));
+  });
+});
+
+const toggle=document.getElementById('panel-toggle');
+toggle.addEventListener('click',()=>{
+  const panel=document.getElementById('upload-panel');
+  panel.classList.toggle('collapsed');
+  toggle.textContent=panel.classList.contains('collapsed')?'+':'−';
+});
+
+function showNotif(msg){
+  const n=document.getElementById('notif');
+  n.textContent=msg; n.classList.add('show');
+  setTimeout(()=>n.classList.remove('show'),2500);
+}
+
+/* ─── ANIMATE ─── */
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.01;
+  updateCamera();
+
+  // Particle drift
+  const pos=pGeo.attributes.position.array;
+  for(let i=0;i<particleCount;i++){
+    pos[i*3+1]+=0.003;
+    if(pos[i*3+1]>ROOM_H) pos[i*3+1]=0;
+  }
+  pGeo.attributes.position.needsUpdate=true;
+
+  // Warm shimmer on gold accent lights
+  scene.children.forEach(c=>{
+    if(c.isPointLight&&c.color.getHex()===0xFFE0A0){
+      c.intensity=2.0+Math.sin(t*1.5)*0.3;
+    }
+  });
+
+  renderer.render(scene,camera);
+}
+animate();
+
+/* ─── RESIZE ─── */
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
+</body>
+</html>
